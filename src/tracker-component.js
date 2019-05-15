@@ -1,6 +1,6 @@
 /* @flow */
 
-import { getClientID, getMerchantID } from '@paypal/sdk-client/src';
+import { getClientID, getMerchantID, getPayPalLoggerDomain } from '@paypal/sdk-client/src';
 
 // $FlowFixMe
 import { generateId } from './generate-id'; // eslint-disable-line import/named
@@ -95,6 +95,49 @@ const setRandomUserIdCookie = () : void => {
     setCookie('paypal-user-id', generateId(), ONE_MONTH_IN_MILLISECONDS);
 };
 
+cosnt getJetlorePayload = (type : string, payload : Object) : Object {
+    switch (type) {
+        case 'addToCart':
+        case 'removeFromCart':
+        case 'purchase':
+            return {
+                deal_id: payload.deal_id,
+                option_id: payload.option_id,
+                count: payload.count
+            };
+        case 'search':
+            return {
+                text: payload.text
+            };
+        case 'view':
+        case 'browse_section':
+            return {
+                name: payload.name,
+                refinements: payload.refinements
+            };
+        case 'browse_promo':
+            return {
+                name: payload.name,
+                id: payload.id
+            };
+        case 'addToWishList':
+        case 'removeFromWishList':
+        case 'addToFavorites':
+        case 'removeFromFavorites':
+            return payload.payload;
+        case 'track':
+            return {
+                event: payload.event,
+                deal_id: payload.deal_id,
+                count: payload.count,
+                price: payload.price,
+                title: payload.title,
+                option_id: payload.option_id,
+                text: payload.text
+            }
+    }
+}
+
 const track = <T>(config : Config, trackingType : TrackingType, trackingData : T) => {
     const encodeData = data => encodeURIComponent(btoa(JSON.stringify(data)));
 
@@ -146,6 +189,7 @@ export const Tracker = (config? : Config = defaultTrackerConfig) => {
         'purchase',
         'search',
         'browse_section',
+        'browse_promo',
         'addToWishList',
         'removeFromWishList',
         'addToFavorites',
@@ -197,15 +241,16 @@ export const Tracker = (config? : Config = defaultTrackerConfig) => {
             config.property = { id: data.property.id };
         }
     };
-    const trackEvent = (type : string, crData : Object, jlData : Object) => {
+    const trackEvent = (type : string, data : Object) => {
         const isJetloreType = config.jetlore
             ? jetloreTrackTypes.includes(type)
             : false;
-        if (config.jetlore && isJetloreType && jlData) {
+        if (config.jetlore && isJetloreType && data) {
+            const jlData = getJetlorePayload(data);
             JL.tracker[type](jlData);
         }
         if (trackers[type]) {
-            trackers[type](crData);
+            trackers[type](data);
         }
     };
     return {
